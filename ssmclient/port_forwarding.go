@@ -21,6 +21,7 @@ import (
 // LocalPort is the port on the local host to listen to.  If not provided, a random port will be used.
 type PortForwardingInput struct {
 	Target     string
+	Host       string
 	RemotePort int
 	LocalPort  int
 }
@@ -121,13 +122,20 @@ outer:
 // PortPluginSession delegates the execution of the SSM port forwarding to the AWS-managed session manager plugin code,
 // bypassing this libraries internal websocket code and connection management.
 func PortPluginSession(cfg aws.Config, opts *PortForwardingInput) error {
+	documentName := "AWS-StartPortForwardingSession"
+	parameters := map[string][]string{
+		"localPortNumber": {strconv.Itoa(opts.LocalPort)},
+		"portNumber":      {strconv.Itoa(opts.RemotePort)},
+	}
+	if opts.Host != "" {
+		documentName = "AWS-StartPortForwardingSessionToRemoteHost"
+		parameters["host"] = []string{opts.Host}
+	}
+
 	in := &ssm.StartSessionInput{
-		DocumentName: aws.String("AWS-StartPortForwardingSession"),
+		DocumentName: aws.String(documentName),
 		Target:       aws.String(opts.Target),
-		Parameters: map[string][]string{
-			"localPortNumber": {strconv.Itoa(opts.LocalPort)},
-			"portNumber":      {strconv.Itoa(opts.RemotePort)},
-		},
+		Parameters:   parameters,
 	}
 
 	return PluginSession(cfg, in)
